@@ -17,16 +17,14 @@ class FlaskrTestCase(unittest.TestCase):
         server.app.db = db
 
         # Drop collection (significantly faster than dropping entire db)
-        db.drop_collection('myobjects')
+        db.drop_collection('trip_collection')
 
     # MyObject tests
 
     def test_posting_myobject(self):
         response = self.app.post(
-            '/myobject/',
-            data=json.dumps(dict(
-                name="A object"
-                )),
+            '/trip/',
+            data=json.dumps(dict(name="A object")),
             content_type='application/json')
 
         responseJSON = json.loads(response.data.decode())
@@ -37,23 +35,21 @@ class FlaskrTestCase(unittest.TestCase):
 
     def test_getting_trip(self):
         response = self.app.post(
-            '/myobject/',
-            data=json.dumps(dict(
-                name="Another object"
-            )),
+            '/trip/',
+            data=json.dumps(dict(name="Another object")),
             content_type='application/json')
 
         postResponseJSON = json.loads(response.data.decode())
         postedObjectID = postResponseJSON["_id"]
 
-        response = self.app.get('/myobject/'+postedObjectID)
+        response = self.app.get('/trip/'+postedObjectID)
         responseJSON = json.loads(response.data.decode())
 
         self.assertEqual(response.status_code, 200)
         assert 'Another object' in responseJSON["name"]
 
     def test_getting_non_existent_trip(self):
-        response = self.app.get('/myobject/55f0cbb4236f44b7f0e3cb23')
+        response = self.app.get('/trip/55f0cbb4236f44b7f0e3cb23')
         self.assertEqual(response.status_code, 404)
 
 if __name__ == '__main__':

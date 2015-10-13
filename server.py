@@ -12,31 +12,31 @@ api = Api(app)
 
 
 # Implement REST Resource
-class MyObject(Resource):
+class TripObject(Resource):
 
     def post(self):
-        # new_myobject = request.json
-        myobject_collection = app.db.myobjects
-        result = myobject_collection.insert_one(request.json)
+        new_trip_object = request.json
+        trip_collection = app.db.trip_collection
+        result = trip_collection.insert_one(new_trip_object)
 
-        myobject = myobject_collection.find_one(
+        trip_object = trip_collection.find_one(
             {"_id": ObjectId(result.inserted_id)})
 
-        return myobject
+        return trip_object
 
-    def get(self, myobject_id):
-        myobject_collection = app.db.myobjects
-        myobject = myobject_collection.find_one({"_id": ObjectId(myobject_id)})
+    def get(self, trip_id):
+        trip_collection = app.db.trip_collection
+        trip_object = trip_collection.find_one({"_id": ObjectId(trip_id)})
 
-        if myobject is None:
+        if trip_object is None:
             response = jsonify(data=[])
             response.status_code = 404
             return response
         else:
-            return myobject
+            return trip_object
 
 # Add REST resource to API
-api.add_resource(MyObject, '/myobject/', '/myobject/<string:myobject_id>')
+api.add_resource(TripObject, '/trip/', '/trip/<string:trip_id>')
 
 
 # provide a custom JSON serializer for flaks_restful
