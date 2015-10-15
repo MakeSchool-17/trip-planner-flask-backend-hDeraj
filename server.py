@@ -1,7 +1,8 @@
-from flask import Flask, request, make_response, jsonify
+from flask import Flask, request, make_response, jsonify, Response
 from flask_restful import Resource, Api
 from pymongo import MongoClient
 from utils.mongo_json_encoder import JSONEncoder
+from functools import wraps
 import bcrypt
 
 # Basic Setup
@@ -17,33 +18,70 @@ def bad(num):
     return response
 
 
+def check_auth(username, password):
+    """This function is called to check if a username /
+    password combination is valid.
+    """
+    user_collection = app.db.users
+    user = user_collection.find_one(
+        {"username": username})
+
+    if user is not None:
+        hashed_pw = user['password']
+        hashed = bcrypt.hashpw(password.encode("utf-8"),
+                               hashed_pw.encode("utf-8")).decode("utf-8")
+        return hashed_pw == hashed
+    return False
+
+
+def authenticate():
+    """Sends a 401 response that enables basic auth"""
+    return Response(
+        'Could not verify your access level for that URL.\n'
+        'You have to login with proper credentials',
+        401,
+        {'WWW-Authenticate': 'Basic realm="Login Required"'})
+
+
+def requires_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        if not auth or not check_auth(auth.username, auth.password):
+            return authenticate()
+        return f(*args, **kwargs)
+    return decorated
+
+
 # Implement REST Resource
-class UserResource(Resource):
+class RegistrationResource(Resource):
 
     def post(self):
         new_user = request.json
         user_collection = app.db.users
 
-        if 'password' not in new_user:
+        if 'password' not in new_user or 'username' not in new_user:
             return bad(403)
 
         user_exists = user_collection.find_one(
             {"username": new_user['username']})
 
-        if not user_exists:
-            hashed = bcrypt.hashpw(new_user['password'].encode("utf-8"),
-                                   bcrypt.gensalt(12)).decode("utf-8")
-            user_collection.insert_one({
-                "username": new_user['username'],
-                "password": hashed
-            })
-            return user_collection.find_one(
-                {"username": new_user['username']})
-        else:
+        if user_exists is not None:
             return bad(403)
 
+        hashed = bcrypt.hashpw(new_user['password'].encode("utf-8"),
+                               bcrypt.gensalt(12)).decode("utf-8")
+        user_collection.insert_one({"username": new_user['username'],
+                                    "password": hashed})
+        return user_collection.find_one(
+            {"username": new_user['username']})
+
+    @requires_auth
+    def get(self):
+        return "success"
+
 # Add REST resource to API
-api.add_resource(UserResource, '/users')
+api.add_resource(RegistrationResource, '/register')
 
 
 # provide a custom JSON serializer for flaks_restful
