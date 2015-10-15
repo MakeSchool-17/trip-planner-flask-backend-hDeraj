@@ -1,8 +1,8 @@
 from flask import Flask, request, make_response, jsonify
 from flask_restful import Resource, Api
 from pymongo import MongoClient
-from bson.objectid import ObjectId
 from utils.mongo_json_encoder import JSONEncoder
+import bcrypt
 
 # Basic Setup
 app = Flask(__name__)
@@ -11,32 +11,39 @@ app.db = mongo.develop_database
 api = Api(app)
 
 
+def bad(num):
+    response = jsonify(data=[])
+    response.status_code = num
+    return response
+
+
 # Implement REST Resource
-class MyObject(Resource):
+class UserResource(Resource):
 
     def post(self):
-        # new_myobject = request.json
-        myobject_collection = app.db.myobjects
-        result = myobject_collection.insert_one(request.json)
+        new_user = request.json
+        user_collection = app.db.users
 
-        myobject = myobject_collection.find_one(
-            {"_id": ObjectId(result.inserted_id)})
+        if 'password' not in new_user:
+            return bad(403)
 
-        return myobject
+        user_exists = user_collection.find_one(
+            {"username": new_user['username']})
 
-    def get(self, myobject_id):
-        myobject_collection = app.db.myobjects
-        myobject = myobject_collection.find_one({"_id": ObjectId(myobject_id)})
-
-        if myobject is None:
-            response = jsonify(data=[])
-            response.status_code = 404
-            return response
+        if not user_exists:
+            hashed = bcrypt.hashpw(new_user['password'].encode("utf-8"),
+                                   bcrypt.gensalt(12)).decode("utf-8")
+            user_collection.insert_one({
+                "username": new_user['username'],
+                "password": hashed
+            })
+            return user_collection.find_one(
+                {"username": new_user['username']})
         else:
-            return myobject
+            return bad(403)
 
 # Add REST resource to API
-api.add_resource(MyObject, '/myobject/', '/myobject/<string:myobject_id>')
+api.add_resource(UserResource, '/users')
 
 
 # provide a custom JSON serializer for flaks_restful

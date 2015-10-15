@@ -17,15 +17,16 @@ class FlaskrTestCase(unittest.TestCase):
         server.app.db = db
 
         # Drop collection (significantly faster than dropping entire db)
-        db.drop_collection('myobjects')
+        db.drop_collection('users')
 
     # MyObject tests
 
-    def test_posting_myobject(self):
+    def test_posting_new_user(self):
         response = self.app.post(
-            '/myobject/',
+            '/users',
             data=json.dumps(dict(
-                name="A object"
+                username="user",
+                password="testing"
                 )),
             content_type='application/json')
 
@@ -33,28 +34,27 @@ class FlaskrTestCase(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         assert 'application/json' in response.content_type
-        assert 'A object' in responseJSON["name"]
+        assert 'user' in responseJSON["username"]
 
-    def test_getting_trip(self):
-        response = self.app.post(
-            '/myobject/',
+    def test_posting_existing_user(self):
+        self.app.post(
+            '/users',
             data=json.dumps(dict(
-                name="Another object"
-            )),
+                username="user",
+                password="testing2"
+                )),
             content_type='application/json')
 
-        postResponseJSON = json.loads(response.data.decode())
-        postedObjectID = postResponseJSON["_id"]
+        response = self.app.post(
+            '/users',
+            data=json.dumps(dict(
+                username="user",
+                password="testing"
+                )),
+            content_type='application/json')
 
-        response = self.app.get('/myobject/'+postedObjectID)
-        responseJSON = json.loads(response.data.decode())
-
-        self.assertEqual(response.status_code, 200)
-        assert 'Another object' in responseJSON["name"]
-
-    def test_getting_non_existent_trip(self):
-        response = self.app.get('/myobject/55f0cbb4236f44b7f0e3cb23')
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 403)
+        assert 'application/json' in response.content_type
 
 if __name__ == '__main__':
     unittest.main()
