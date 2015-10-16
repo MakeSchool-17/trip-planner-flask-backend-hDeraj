@@ -128,6 +128,10 @@ class TripResource(Resource):
             "username": request.authorization.username
         })
 
+    @requires_auth
+    def put(self, trip_id=None):
+        pass
+
 
 # Add REST resource to API
 api.add_resource(RegistrationResource, '/register')
