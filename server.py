@@ -80,8 +80,58 @@ class RegistrationResource(Resource):
     def get(self):
         return "success"
 
+
+class TripResource(Resource):
+    @requires_auth
+    def get(self, trip_id=None):
+        trips_collection = app.db.trips
+        if trip_id is None:
+            return list(trips_collection.find({
+                "username": request.authorization.username
+            }))
+        else:
+            return list(trips_collection.find_one({
+                "username": request.authorization.username,
+                "trip_id": trip_id
+            }))
+
+    @requires_auth
+    def post(self, trip_id=None):
+        trips_collection = app.db.trips
+        data = request.json
+
+        if trip_id is None:
+            if "trip_id" not in data:
+                return bad(403)
+        trip_id = trip_id if trip_id is not None else data['trip_id']
+
+        trip_exists = trips_collection.find_one(
+            {"username": request.authorization.username,
+             "trip_id": trip_id})
+
+        if trip_exists is not None:
+            return bad(403)
+
+        waypoints = [] if "waypoints" not in data else data["waypoints"]
+        trip_name = "" if "trip_name" not in data else data["trip_name"]
+        trip_date = "" if "trip_date" not in data else data["trip_date"]
+
+        if trip_name == "" \
+                or trip_date == "":
+            return bad(403)
+
+        trips_collection.insert_one({
+            "waypoints": waypoints,
+            "trip_name": trip_name,
+            "trip_date": trip_date,
+            "trip_id": trip_id,
+            "username": request.authorization.username
+        })
+
+
 # Add REST resource to API
 api.add_resource(RegistrationResource, '/register')
+api.add_resource(TripResource, '/trips', '/trips/<trip_id>')
 
 
 # provide a custom JSON serializer for flaks_restful

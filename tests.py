@@ -2,6 +2,7 @@ import server
 import unittest
 import json
 from pymongo import MongoClient
+import base64
 
 
 class FlaskrTestCase(unittest.TestCase):
@@ -18,6 +19,7 @@ class FlaskrTestCase(unittest.TestCase):
 
         # Drop collection (significantly faster than dropping entire db)
         db.drop_collection('users')
+        db.drop_collection('trips')
 
     def test_registering_new_user(self):
         response = self.app.post(
@@ -34,7 +36,7 @@ class FlaskrTestCase(unittest.TestCase):
         assert 'application/json' in response.content_type
         assert 'user' in responseJSON["username"]
 
-    def test_posting_existing_user(self):
+    def test_registering_existing_user(self):
         self.app.post(
             '/register',
             data=json.dumps(dict(
@@ -53,6 +55,87 @@ class FlaskrTestCase(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
         assert 'application/json' in response.content_type
+
+    def test_unauthorized_trip_get(self):
+        response = self.app.get(
+            '/trips',
+            content_type='application/json')
+        self.assertEqual(response.status_code, 401)
+        assert 'application/json' not in response.content_type
+
+        response = self.app.get(
+            '/trips',
+            headers=[('Authorization', "Basic " +
+                     base64.b64encode('user:testing2'.encode()).decode()),
+                     ('Content-Type', 'application/json')])
+        self.assertEqual(response.status_code, 401)
+        assert 'application/json' not in response.content_type
+
+    def test_authorized_trip_get(self):
+        self.app.post(
+            '/register',
+            data=json.dumps(dict(
+                username="user",
+                password="testing2"
+                )),
+            content_type='application/json')
+
+        response = self.app.get(
+            '/trips',
+            headers=[('Authorization', "Basic " +
+                     base64.b64encode('user:testing2'.encode()).decode()),
+                     ('Content-Type', 'application/json')])
+
+        self.assertEqual(response.status_code, 200)
+        assert 'application/json' in response.content_type
+
+    def test_unauthorized_trip_post(self):
+        response = self.app.post(
+            '/trips/1234',
+            headers=[('Authorization', "Basic " +
+                     base64.b64encode('user:testing2'.encode()).decode()),
+                     ('Content-Type', 'application/json')])
+        self.assertEqual(response.status_code, 401)
+        assert 'application/json' not in response.content_type
+
+    def test_authorized_trip_post(self):
+        self.app.post(
+            '/register',
+            data=json.dumps(dict(
+                username="user",
+                password="testing2"
+                )),
+            content_type='application/json')
+
+        response = self.app.post(
+            '/trips/1234',
+            data=json.dumps(dict(
+                trip_name="test_trip",
+                trip_date="june"
+                )),
+            headers=[('Authorization', "Basic " +
+                     base64.b64encode('user:testing2'.encode()).decode()),
+                     ('Content-Type', 'application/json')])
+
+        self.assertEqual(response.status_code, 200)
+
+        response = response = self.app.get(
+            '/trips',
+            headers=[('Authorization', "Basic " +
+                     base64.b64encode('user:testing2'.encode()).decode()),
+                     ('Content-Type', 'application/json')])
+
+        self.assertEqual(response.status_code, 200)
+        trip = json.loads(response.data.decode())
+        self.assertEqual(len(trip), 1)
+        trip = trip[0]
+        self.assertEqual(trip['trip_id'], "1234")
+        self.assertEqual(trip['trip_name'], "test_trip")
+        self.assertEqual(trip['trip_date'], "june")
+        self.assertEqual(trip['waypoints'], [])
+        self.assertEqual(trip['username'], "user")
+        assert "_id" in trip
+
 
 if __name__ == '__main__':
     unittest.main()
